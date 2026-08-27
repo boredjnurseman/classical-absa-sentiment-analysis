@@ -1,0 +1,15 @@
+.worktrees/
+.DS_Store
+.idea/
+*.egg-info/
+build/
+dist/
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+data/archives/
+data/raw/
+artifacts/.staging/
+*.joblib
+*.pkl

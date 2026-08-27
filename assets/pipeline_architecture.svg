@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1580" role="img" aria-labelledby="title desc">
+  <title id="title">Classical aspect-based sentiment analysis pipeline</title>
+  <desc id="desc">Raw reviews are parsed and split. Training data fits a CRF, opinion lexicon and PMI model. Development data selects a linker. Test data produces predicted aspect opinion polarity records for evaluation and product summaries.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#26324B"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="140%">
+      <feDropShadow dx="7" dy="8" stdDeviation="4" flood-color="#172033" flood-opacity="0.13"/>
+    </filter>
+    <style>
+      .box { stroke:#26324B; stroke-width:3; rx:18; filter:url(#shadow); }
+      .source { fill:#F4F7FB; }
+      .process { fill:#EAF2FF; }
+      .train { fill:#E8F6F1; }
+      .dev { fill:#FFF3D9; }
+      .test { fill:#F3ECFF; }
+      .output { fill:#FFF0F1; }
+      .title { font:700 30px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#182238; text-anchor:middle; }
+      .label { font:600 25px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#182238; text-anchor:middle; }
+      .small { font:400 20px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#34415B; text-anchor:middle; }
+      .lane { font:700 20px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#34415B; letter-spacing:1px; }
+      .arrow { stroke:#26324B; stroke-width:4; fill:none; marker-end:url(#arrow); }
+      .dash { stroke-dasharray:10 9; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="1580" fill="#FFFFFF"/>
+  <text x="600" y="50" class="title">Classical ABSA: training, selection and inference</text>
+
+  <rect x="350" y="90" width="500" height="110" class="box source"/>
+  <text x="600" y="137" class="label">Raw Hu–Liu review files</text>
+  <text x="600" y="171" class="small">17 products across three corpora</text>
+  <path d="M600 200 V260" class="arrow"/>
+
+  <rect x="300" y="270" width="600" height="130" class="box process"/>
+  <text x="600" y="321" class="label">Parse, annotate and split</text>
+  <text x="600" y="356" class="small">Hide annotation prefixes · spaCy parse · review-level 60/20/20 split</text>
+
+  <text x="120" y="465" class="lane">TRAIN</text>
+  <text x="510" y="465" class="lane">DEVELOPMENT</text>
+  <text x="950" y="465" class="lane">TEST</text>
+  <path d="M430 400 C430 440 215 430 215 500" class="arrow"/>
+  <path d="M600 400 V500" class="arrow"/>
+  <path d="M770 400 C770 440 985 430 985 500" class="arrow"/>
+
+  <rect x="55" y="510" width="320" height="210" class="box train"/>
+  <text x="215" y="557" class="label">Fit classical models</text>
+  <text x="215" y="598" class="small">• five aspect baselines</text>
+  <text x="215" y="632" class="small">• BIO linear-chain CRF</text>
+  <text x="215" y="666" class="small">• opinion lexicon + PMI</text>
+
+  <rect x="440" y="510" width="320" height="210" class="box dev"/>
+  <text x="600" y="557" class="label">Compare and select</text>
+  <text x="600" y="598" class="small">Aspect exact/head metrics</text>
+  <text x="600" y="632" class="small">Gold-aspect linker diagnostic</text>
+  <text x="600" y="666" class="small">Freeze by macro-F1, then coverage</text>
+
+  <rect x="825" y="510" width="320" height="210" class="box test"/>
+  <text x="985" y="557" class="label">Held-out inference</text>
+  <text x="985" y="598" class="small">Predict aspect spans</text>
+  <text x="985" y="632" class="small">Extract opinion candidates</text>
+  <text x="985" y="666" class="small">No test-driven selection</text>
+
+  <path d="M375 615 H440" class="arrow"/>
+  <path d="M760 615 H825" class="arrow"/>
+  <path d="M215 720 C215 790 600 750 600 830" class="arrow dash"/>
+  <path d="M600 720 V830" class="arrow"/>
+  <path d="M985 720 C985 790 600 750 600 830" class="arrow"/>
+
+  <rect x="300" y="840" width="600" height="150" class="box process"/>
+  <text x="600" y="895" class="label">Selected aspect–opinion linker</text>
+  <text x="600" y="934" class="small">Dependency distance · PMI · ordered fallbacks · negation-aware polarity</text>
+  <path d="M600 990 V1060" class="arrow"/>
+
+  <rect x="285" y="1070" width="630" height="135" class="box output"/>
+  <text x="600" y="1122" class="label">Predicted aspect–opinion–polarity records</text>
+  <text x="600" y="1162" class="small">Deployable records use CRF-predicted aspects—not gold spans</text>
+
+  <path d="M470 1205 C470 1260 275 1245 275 1310" class="arrow"/>
+  <path d="M730 1205 C730 1260 925 1245 925 1310" class="arrow"/>
+
+  <rect x="90" y="1320" width="370" height="150" class="box source"/>
+  <text x="275" y="1374" class="label">End-to-end evaluation</text>
+  <text x="275" y="1414" class="small">Joint aspect + polarity</text>
+  <text x="275" y="1445" class="small">Exact and head matching</text>
+
+  <rect x="740" y="1320" width="370" height="150" class="box source"/>
+  <text x="925" y="1374" class="label">Product summaries</text>
+  <text x="925" y="1414" class="small">Positive/negative evidence</text>
+  <text x="925" y="1445" class="small">Static figures + complete CSV</text>
+
+  <text x="600" y="1540" class="small">Gold aspects appear only in training labels and the clearly separated development diagnostic.</text>
+</svg>

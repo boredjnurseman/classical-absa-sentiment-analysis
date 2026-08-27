@@ -1,0 +1,4 @@
+dataset,n_reviews,n_files,n_products,n_labels,positive_labels,negative_labels
+CustomerReviews-3_domains,2099,3,3,1101,817,284
+Customer_review_data,313,5,5,2102,1358,744
+Reviews-9-products,855,9,9,2572,1732,840

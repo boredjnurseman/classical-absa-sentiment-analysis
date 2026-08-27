@@ -1,0 +1,71 @@
+{
+  "artifact_sha256": {
+    "ate_baselines.csv": "79ae9e76fbc88facb8f299ca5f9ad4e632af7fee51cd10db10fa44e7f090d6f8",
+    "corpus_summary.csv": "bf2970f57fd89b90fa9815793c20f538baa483e013ca0157065336bd616aa62a",
+    "crf_metrics.csv": "3c6f07884120425edf7179b1a394d6e777c353c2b5b6301f1c7bcd1aa46f87d1",
+    "end_to_end_metrics.csv": "3dab45e9c67187cabe2529cd0c435d826aa45291f6a00203992dc9960d6137c3",
+    "figures/ate_comparison.png": "b4b9f04aa079b437516c2afb548e18a5df7dea34f2be1dec31956837f2abfc67",
+    "figures/linking_tradeoff.png": "47ea6476c1997553a8bae9c8fb486230cc850014ced38e44eee4128e045d4e79",
+    "figures/product_summaries.png": "3931d84d0a664f00f4a6b4f97da1726d07123b7bd125c0ed38760c51d501df3e",
+    "linking_metrics.csv": "545938b8f5a91d34cca13f36bd4b46a887223dff1291cdc0d9cc4288959cfc3b",
+    "negation_ablation.csv": "73d7770de66678c8a083932ae3e8f0700ce57c4416576a366458f9ae6b2521c0",
+    "product_summaries.csv": "d07226b6c1febe258346248f480bd82e3ebe90a09b0ba349ff099fff3c1088dd"
+  },
+  "created_utc": "2026-08-27T19:13:10.279822+00:00",
+  "data_sha256": {
+    "CustomerReviews-3_domains/Computer.txt": "b887a5ccdaa2f877d40643be42049b93c682bb7d89d20f0f1cbb5dcc85a9c6b2",
+    "CustomerReviews-3_domains/Readme.txt": "b2151358dc171708b11f71d098b9fcf1469aea8c6474fb45001e0d0b59f85d72",
+    "CustomerReviews-3_domains/Router.txt": "9309381f11f9d933b13070994e9313557db1b62777e266a312cc3b56a0dc88b2",
+    "CustomerReviews-3_domains/Speaker.txt": "eb4fb078a4e88fe6e64cfc24f9271e5186bc6e868112333c0c7c1f2d529863ae",
+    "Customer_review_data/Apex AD2600 Progressive-scan DVD player.txt": "7ba308a65978d95d98b718960938c916034bd42b5db9f1396a380b47e82207f1",
+    "Customer_review_data/Canon G3.txt": "ef779db87f792cced8f145d78a5134e3f96b1df0f1d9e64deea831966b4075c6",
+    "Customer_review_data/Creative Labs Nomad Jukebox Zen Xtra 40GB.txt": "d63bc7d4f619794a472496759220bf9894dd20486f6de2d48190a02c29642e22",
+    "Customer_review_data/Nikon coolpix 4300.txt": "b045df8eda82e189454f914ddd6fb76ca3c8f4f14e305f089fc69fc6668b42e3",
+    "Customer_review_data/Nokia 6610.txt": "1cc9542bd4e7a00d81c84a8a8aab23bee23d667eb5313127f65be8e27c11505a",
+    "Customer_review_data/Readme.txt": "b070780193755010ef5d53829c37f5ed96d8af0aecdd0a7fcf1d4453979adf2d",
+    "Reviews-9-products/Canon PowerShot SD500.txt": "4862926d3c924e47976f1118ad99fa72b1f6b681430d76b6ef7cb908c9995394",
+    "Reviews-9-products/Canon S100.txt": "2db0fd09dbff7a694342febbb3510a66579488303f906515784a740996a00b20",
+    "Reviews-9-products/Diaper Champ.txt": "5443675d182708536af39a806d542a4dc6179d3eac1c71dda1215a21d5a5f6e9",
+    "Reviews-9-products/Hitachi router.txt": "c39f53cf9b5e37280a86e90f4fcbdb004b872460520abb2600bcda76ac4c07e3",
+    "Reviews-9-products/Linksys Router.txt": "0f1a5917bfb802da3649ce730f00c92333d893c3ff5171b680fe119b7df08b27",
+    "Reviews-9-products/MicroMP3.txt": "e8d549b4a52c576638e2c699e787db4df801a46a33d176d039c55311af052936",
+    "Reviews-9-products/Nokia 6600.txt": "c642d5822867ed4efd6121cdc16b752821c4cf43e265c12719e28ee6f9aab380",
+    "Reviews-9-products/ipod.txt": "d937f603c6d1bd498ec691b0d1e161d40f2dac632aabb722cb5312a2759fe7bc",
+    "Reviews-9-products/norton.txt": "c445fa30eae4a39f7c2201c9f02bc3f5eb2a60d20189d557e2ba593659a0c97b"
+  },
+  "elapsed_seconds": 69.109,
+  "learned_state": {
+    "opinion_lexicon_size": 193,
+    "pmi_pair_count": 6187
+  },
+  "seed": 42,
+  "selected_linker": "pmi",
+  "settings": {
+    "max_dep_distance": 4,
+    "min_count": 5,
+    "seed": 42,
+    "spacy_model": "en_core_web_sm",
+    "top_k": 200,
+    "window": 6
+  },
+  "split_review_counts": {
+    "dev": 653,
+    "test": 653,
+    "train": 1961
+  },
+  "status": "complete",
+  "training_alignment": {
+    "aligned_aspects": 2547,
+    "match_rate": 0.7460456942003515,
+    "reason_counts": {
+      "unmatched_span": 867
+    },
+    "total_gold_aspects": 3414
+  },
+  "versions": {
+    "python": "3.12.2",
+    "sklearn_crfsuite": "0.5.0",
+    "spacy": "3.8.16",
+    "spacy_model": "3.8.0"
+  }
+}
