@@ -552,7 +552,16 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    """Parse command-line settings, run the experiment, and report its output."""
+    """Run the reproducible experiment command-line entry point.
+
+    The parser accepts the local raw-data directory, artifact output
+    directory, and random seed.  The function prints the publication location
+    and selected linker; all tables and figures are written by
+    :func:`run_experiment`.
+
+    Returns:
+        ``None``.  Data and validation errors propagate to the caller.
+    """
     args = _parse_args()
     result = run_experiment(
         RunConfig(data_dir=args.data_dir, output_dir=args.output_dir, seed=args.seed)

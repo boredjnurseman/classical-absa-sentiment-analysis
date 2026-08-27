@@ -262,6 +262,15 @@ def _parse_line_file(path: Path) -> list[tuple[int, str]]:
 
 
 def _aspect_pairs(text: str) -> tuple[tuple[str, int, int], ...]:
+    """Extract structural ``(aspect, polarity, offset)`` triples.
+
+    Args:
+        text: Raw line containing one or more Hu--Liu polarity markers.
+
+    Returns:
+        Ordered non-empty aspect labels, integer polarities, and source
+        offsets.  Labels that cannot be bounded structurally are omitted.
+    """
     return tuple(
         (match.aspect, match.polarity, match.aspect_start)
         for match in _annotation_matches(text)
