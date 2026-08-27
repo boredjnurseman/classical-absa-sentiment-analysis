@@ -6,7 +6,7 @@ This project rebuilds part of my MSc Artificial Intelligence coursework at the U
 
 [Read the executed case-study notebook](notebooks/Classical_ABSA_Pipeline.ipynb).
 
-## Fresh-run results
+## Results
 
 The checked-in artifacts come from a seed-42 run over 3,267 parsed review units, 17 products or domains, and 5,775 non-neutral aspect labels.
 
@@ -19,7 +19,7 @@ The checked-in artifacts come from a seed-42 run over 3,267 parsed review units,
 | Joint aspect-polarity F1, exact / head | test | 0.167 / 0.175 |
 | Predicted aspects receiving a polarity link | test | 0.612 |
 
-These are intentionally not historical notebook numbers. The run blanks each inline gold annotation prefix before linguistic processing, so the CRF cannot read the labelled aspect that appears before `##`. Only 74.6% of training labels align to an actual contiguous mention after that correction. The lower, more realistic scores expose the effect of incomplete alignment and staged error propagation.
+The run blanks each inline gold annotation prefix before linguistic processing, so the CRF cannot read the labelled aspect that appears before `##`. Only 74.6% of training labels align to an actual contiguous mention after that correction. The scores expose the effect of incomplete alignment and staged error propagation.
 
 ![Classical ABSA training, selection and inference architecture](assets/pipeline_architecture.svg)
 
@@ -33,6 +33,12 @@ These are intentionally not historical notebook numbers. The run blanks each inl
 - Development-only model selection followed by held-out joint aspect-polarity evaluation.
 - Atomic publication of aggregate CSVs, static figures, checksums, and a run manifest.
 - A default test suite that uses fabricated reviews and needs neither network access nor private data.
+
+## Design rationale
+
+The corpus gives aspect polarity but not opinion spans or aspect--opinion links. The pipeline therefore separates the questions: a structured CRF predicts aspect spans; a training-fitted lexicon proposes opinion candidates; and explicit dependency/PMI linkers attach evidence. Gold aspects are used for training and the labelled linker diagnostic only. Product summaries use CRF-predicted aspects.
+
+The main implementation is deliberately inspectable: [`data.py`](src/review_absa/data.py) handles offset-preserving annotation masking, [`aspects.py`](src/review_absa/aspects.py) builds BIO features and reports alignment, [`opinions.py`](src/review_absa/opinions.py) induces polarity, and [`linking.py`](src/review_absa/linking.py) makes deterministic attachment choices. Publication swaps the complete result directory so a reader never sees a mixture of runs.
 
 ## Evaluation boundary
 
@@ -121,3 +127,11 @@ python -m pytest -v -p no:cacheprovider
 ## Licence and data provenance
 
 Code and documentation are MIT licensed. That licence does not cover the separately distributed review corpora. Follow the dataset authors' citation and usage guidance in [`data/README.md`](data/README.md).
+
+## Selected references
+
+- Hu and Liu, [*Mining and summarizing customer reviews* (KDD 2004)](https://www.cs.uic.edu/~liub/publications/kdd04-revSummary.pdf).
+- Hu and Liu, [*Mining opinion features in customer reviews* (AAAI 2004)](https://www.cs.uic.edu/~liub/publications/aaai04-featureExtract.pdf).
+- Lafferty, McCallum and Pereira, [*Conditional random fields* (2001)](https://www.cs.cmu.edu/~epxing/Class/10708-19/notes/10708_scribe_notes.pdf).
+- Qiu et al., [*Opinion word expansion and target extraction* (ACL 2011)](https://aclanthology.org/J11-1002/).
+- Pontiki et al., [*SemEval-2014 Task 4*](https://aclanthology.org/S14-2004/).

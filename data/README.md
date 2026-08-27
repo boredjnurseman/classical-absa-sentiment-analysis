@@ -14,7 +14,7 @@ data/raw/
 Official archives:
 
 - [Customer Review Data (five products)](https://www.cs.uic.edu/~liub/FBS/CustomerReviewData.zip)
-- [Additional Reviews (nine products)](https://www.cs.uic.edu/~liub/FBS/Reviews-9-products.rar)
+- [Nine-product review archive](https://www.cs.uic.edu/~liub/FBS/Reviews-9-products.rar)
 - [Customer Reviews (three domains)](https://www.cs.uic.edu/~liub/FBS/CustomerReviews-3-domains.rar)
 
 The archives use two directory names that differ from the package's canonical
@@ -26,6 +26,10 @@ layout.
 
 The full run also requires spaCy's `en_core_web_sm` model at version 3.8.0.
 The exact installation command is documented in the project README.
+
+The executed notebook displays one short, cited corpus line and its masked,
+parsed form. It is an illustrative excerpt, not a redistribution of the raw
+corpus; obtain the complete data from the official archives above.
 
 The repository's MIT licence covers its code and documentation only. It does
 not assign a licence to these separately distributed corpora. Cite the source

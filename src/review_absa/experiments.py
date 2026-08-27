@@ -85,12 +85,17 @@ _FORBIDDEN_ARTIFACT_TEXT = ("/Users/", "/home/", "/content/drive", "::")
 
 
 class ArtifactValidationError(ValueError):
-    """Raised before publication when aggregate artifacts violate their contract."""
+    """Signal that a result set cannot satisfy the public artifact contract."""
 
 
 @dataclass(frozen=True)
 class RunConfig:
-    """All settings required for one reproducible run."""
+    """Capture all settings needed to reproduce one experiment.
+
+    Paths identify local input/output locations and are deliberately omitted
+    from the published manifest.  The remaining values define the seed,
+    feature vocabulary, opinion window, dependency cutoff, and spaCy model.
+    """
 
     data_dir: Path
     output_dir: Path
@@ -104,7 +109,13 @@ class RunConfig:
 
 @dataclass(frozen=True)
 class RunResult:
-    """Published run identity with development-selected deployment settings."""
+    """Return the selected deployment method and published manifest.
+
+    Attributes:
+        selected_linker: Method chosen using development-only metrics.
+        output_dir: Directory containing the complete result set.
+        manifest: Aggregate run metadata and artifact checksums.
+    """
 
     selected_linker: str
     output_dir: Path
@@ -112,7 +123,21 @@ class RunResult:
 
 
 def select_linker(rows: pd.DataFrame) -> str:
-    """Select by development macro-F1, coverage, then stable method name."""
+    """Select a linker by macro-F1, then coverage, then method name.
+
+    The stable lexical tie-break makes selection deterministic while keeping
+    macro-F1 as the declared primary objective.
+
+    Args:
+        rows: Development linker metrics with ``method``, ``macro_f1``, and
+            ``coverage`` columns.
+
+    Returns:
+        Name of the highest-ranked linker.
+
+    Raises:
+        ValueError: If no rows exist or required columns are missing.
+    """
 
     required = {"method", "macro_f1", "coverage"}
     if rows.empty or not required.issubset(rows.columns):
@@ -159,7 +184,26 @@ def publish_artifacts(
     figures: Mapping[str, Figure] | None = None,
     manifest: Mapping[str, object] | None = None,
 ) -> dict[str, str]:
-    """Validate, stage and publish the complete aggregate result set."""
+    """Validate and atomically publish one complete aggregate result set.
+
+    Tables, figures, and the manifest are written beneath a staging directory
+    first.  A directory rename then swaps the finished set into place; if
+    either rename fails, the previous complete set is restored.  This prevents
+    readers from observing a mixture of old and new artifacts.
+
+    Args:
+        tables: Mapping containing exactly the public CSV schemas.
+        output_dir: Destination directory for the result set.
+        figures: Exactly one figure for each declared public PNG.
+        manifest: Additional aggregate metadata to include in the manifest.
+
+    Returns:
+        SHA-256 hashes for the published tables and figures.
+
+    Raises:
+        ArtifactValidationError: If schemas, figure names, or public text are
+            unsafe or incomplete.
+    """
 
     _validate_tables(tables)
     if figures is None or set(figures) != set(_FIGURE_NAMES):
@@ -287,7 +331,19 @@ def _data_checksums(data_dir: Path) -> dict[str, str]:
 
 
 def run_experiment(config: RunConfig) -> RunResult:
-    """Fit on train, select on development, then publish one test evaluation."""
+    """Run the leakage-safe train/select/test pipeline once.
+
+    Models, vocabularies, opinion polarity, and PMI state are fitted on the
+    training split.  Development metrics select the linker; the frozen choice
+    is then evaluated on held-out test reviews and used to build predicted-
+    aspect product summaries.
+
+    Args:
+        config: Reproducibility settings and local data/artifact paths.
+
+    Returns:
+        The selected linker and manifest for the atomically published result.
+    """
 
     started = time.perf_counter()
     nlp = spacy.load(config.spacy_model)
@@ -496,6 +552,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Parse command-line settings, run the experiment, and report its output."""
     args = _parse_args()
     result = run_experiment(
         RunConfig(data_dir=args.data_dir, output_dir=args.output_dir, seed=args.seed)

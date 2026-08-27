@@ -46,7 +46,19 @@ class _AnnotationMatch:
 
 
 def _marker_end(text: str, start: int) -> int:
-    """Consume adjacent Hu--Liu marker tags after a polarity tag."""
+    """Return the end of any marker tags attached to a polarity label.
+
+    Hu--Liu files sometimes append tags such as ``[u]`` or ``[cc]`` after a
+    numeric polarity.  They are annotation metadata rather than review text,
+    so the masking boundary must include the complete run of adjacent tags.
+
+    Args:
+        text: Annotated source text.
+        start: Character offset immediately after a numeric polarity tag.
+
+    Returns:
+        The first character after the adjacent marker sequence.
+    """
 
     end = start
     while end < len(text):
@@ -67,6 +79,13 @@ def _last_sentence_boundary(raw: str) -> int | None:
     before the next ``##`` delimiter.  Restricting this heuristic to a
     sentence-ending mark followed by whitespace keeps punctuation inside
     aspects such as ``camera.v2`` intact.
+
+    Args:
+        raw: Text between the line/separator boundary and a polarity tag.
+
+    Returns:
+        The end offset of the last plausible sentence boundary, or ``None``
+        when the clause contains no such boundary.
     """
 
     boundary: int | None = None
@@ -77,7 +96,21 @@ def _last_sentence_boundary(raw: str) -> int | None:
 
 
 def _candidate_start(text: str, score_start: int, previous_end: int) -> int:
-    """Locate the start of the current structural annotation clause."""
+    """Locate the start of the annotation clause before one polarity tag.
+
+    The usual ``##`` separator is preferred, but the raw corpora also contain
+    single-hash, comma-separated, and occasionally missing-separator layouts.
+    The previous numeric tag prevents a later tag from absorbing an earlier
+    clause when several annotations share a line.
+
+    Args:
+        text: Complete annotated source string.
+        score_start: Character offset of the current ``[+n]`` tag.
+        previous_end: End offset of the preceding polarity tag.
+
+    Returns:
+        Character offset at which the current candidate clause begins.
+    """
 
     line_start = text.rfind("\n", 0, score_start) + 1
     start = max(line_start, previous_end)
@@ -96,7 +129,22 @@ def _candidate_start(text: str, score_start: int, previous_end: int) -> int:
 
 
 def _aspect_text(text: str, start: int, score_start: int) -> tuple[str, int]:
-    """Normalise an aspect clause and return its text plus its true start."""
+    """Extract one aspect phrase from a structural annotation clause.
+
+    Marker tags and malformed preceding polarity fragments are removed before
+    comma-separated clauses are reduced to the phrase associated with the
+    current numeric tag.  The returned offset is measured in the original
+    string, which is important for sentence anchoring and leakage-safe
+    masking.
+
+    Args:
+        text: Complete annotated source string.
+        start: Start of the candidate clause.
+        score_start: Offset of the current numeric polarity tag.
+
+    Returns:
+        A pair containing the normalised aspect text and its source offset.
+    """
 
     original = text[start:score_start]
     raw = _TRAILING_MARKERS.sub("", original)
@@ -113,7 +161,20 @@ def _aspect_text(text: str, start: int, score_start: int) -> tuple[str, int]:
 
 
 def _annotation_matches(text: str) -> tuple[_AnnotationMatch, ...]:
-    """Parse one structural aspect clause for every numeric polarity tag."""
+    """Parse every numeric polarity tag into an offset-aware match.
+
+    Parsing is deliberately structural rather than suffix-based: a valid
+    aspect may begin with a digit, contain punctuation, or be longer than the
+    common examples in the original files.  Each numeric tag still defines a
+    distinct supervision record, including records in comma-separated clauses.
+
+    Args:
+        text: Annotated review text in a Hu--Liu layout.
+
+    Returns:
+        Matches containing aspect text, polarity, source offset, and the range
+        that must be blanked before linguistic processing.
+    """
 
     matches: list[_AnnotationMatch] = []
     previous_end = 0
@@ -135,7 +196,20 @@ def _annotation_matches(text: str) -> tuple[_AnnotationMatch, ...]:
 
 
 def clean_text_length_preserving(text: str | None) -> str:
-    """Hide inline supervision and markup without shifting character offsets."""
+    """Mask annotation supervision while preserving every character offset.
+
+    The model must see the review sentence but not the labelled aspect prefix.
+    Replacing supervision with spaces, rather than deleting it, keeps the
+    annotation offsets and spaCy character coordinates comparable to the raw
+    string.  Numeric labels, marker tags, hash separators, and malformed label
+    fragments are all treated as markup.
+
+    Args:
+        text: Annotated review text, or ``None`` for an empty input.
+
+    Returns:
+        A same-length string suitable for linguistic processing.
+    """
 
     if text is None:
         return ""
@@ -214,7 +288,24 @@ def _sentence_annotations(text: str, doc) -> dict[int, tuple[GoldAspect, ...]]:
 
 
 def load_corpus(data_dir: Path | str, nlp: Language) -> Corpus:
-    """Load all three expected review datasets from a local directory."""
+    """Load the three supported Hu--Liu layouts from local files.
+
+    Each source review is parsed, masked, and passed through the supplied
+    spaCy pipeline.  The parser keeps the annotated source and clean model
+    input together so later components can use the same stable review UID and
+    sentence boundaries.
+
+    Args:
+        data_dir: Directory containing the three canonical corpus folders.
+        nlp: Configured spaCy language pipeline used to parse clean text.
+
+    Returns:
+        A :class:`Corpus` containing product identities and parsed reviews.
+
+    Raises:
+        FileNotFoundError: If one of the required corpus folders is absent.
+        ValueError: If the supplied directories contain no parseable reviews.
+    """
 
     root = Path(data_dir)
     missing = [name for name in _DATASET_LAYOUTS if not (root / name).is_dir()]
@@ -263,7 +354,17 @@ def gold_by_sentence(
     *,
     polarity_as_sign: bool = False,
 ) -> dict[SentenceKey, tuple[GoldAspect, ...]]:
-    """Return gold aspects keyed by review UID and sentence index."""
+    """Return annotations keyed by stable review UID and sentence index.
+
+    Args:
+        corpus: Parsed reviews whose annotations should be materialised.
+        polarity_as_sign: If true, collapse the source scale to ``+1`` and
+            ``-1`` and omit neutral ``0`` annotations.
+
+    Returns:
+        A mapping from ``(review_uid, sentence_index)`` to immutable aspect
+        records.  Empty sentence entries are omitted.
+    """
 
     result: dict[SentenceKey, tuple[GoldAspect, ...]] = {}
     for review in corpus:
@@ -288,7 +389,20 @@ def _subset(corpus: Corpus, selected: set[str]) -> Corpus:
 
 
 def split_corpus(corpus: Corpus, *, seed: int = 42) -> CorpusSplits:
-    """Split reviews deterministically into 60/20/20 partitions."""
+    """Split reviews deterministically into review-level 60/20/20 partitions.
+
+    Sorting UIDs before seeded shuffling makes the split independent of file
+    enumeration order.  Partitioning complete reviews, rather than individual
+    sentences, prevents near-duplicate sentences from crossing evaluation
+    boundaries.
+
+    Args:
+        corpus: Corpus to partition.
+        seed: Seed for the deterministic NumPy generator.
+
+    Returns:
+        A :class:`CorpusSplits` containing train, development, and test corpora.
+    """
 
     uids = np.array(sorted(review.uid for review in corpus), dtype=object)
     rng = np.random.default_rng(seed)

@@ -29,6 +29,22 @@ def test_notebook_has_expected_story_and_no_implementation() -> None:
     assert "pip install" not in code and "google.colab" not in code
 
 
+def test_notebook_shows_preprocessing_math_references_and_source_map() -> None:
+    notebook = nbformat.read(NOTEBOOK, as_version=4)
+    source = "\n".join("".join(cell.source) for cell in notebook.cells)
+    expected = [
+        "Raw corpus example",
+        "clean_text_length_preserving",
+        "\\mathrm{PMI}",
+        "Conditional random fields",
+        "References",
+        "github.com/boredjnurseman/classical-absa-sentiment-analysis/blob/main/src/review_absa/data.py",
+        "github.com/boredjnurseman/classical-absa-sentiment-analysis/blob/main/src/review_absa/aspects.py",
+        "github.com/boredjnurseman/classical-absa-sentiment-analysis/blob/main/src/review_absa/linking.py",
+    ]
+    assert all(item in source for item in expected)
+
+
 def test_saved_notebook_contains_no_error_outputs() -> None:
     notebook = nbformat.read(NOTEBOOK, as_version=4)
     errors = [

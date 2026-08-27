@@ -20,7 +20,19 @@ _METHODS = frozenset({"dep", "pmi", "dep->pmi", "pmi->dep"})
 
 @dataclass(frozen=True)
 class AspectOpinionLink:
-    """One predicted aspect, opinion and polarity relationship."""
+    """Represent one deployable aspect--opinion--polarity relationship.
+
+    Attributes:
+        review_uid: Stable identifier of the source review.
+        product_name: Product associated with the relationship.
+        sentence_index: Sentence containing both candidates.
+        aspect_text: Predicted aspect surface form.
+        aspect_start_token: Inclusive aspect token index.
+        aspect_end_token: Exclusive aspect token index.
+        opinion_text: Opinion surface form selected by the linker.
+        opinion_lemma: Normalised opinion form used for diagnostics.
+        polarity: Context-adjusted polarity sign.
+    """
 
     review_uid: str
     product_name: str
@@ -34,7 +46,12 @@ class AspectOpinionLink:
 
 
 class PMIModel:
-    """Sentence co-occurrence scores learned exclusively from training data."""
+    """Score aspect-head and opinion associations from training co-occurrence.
+
+    PMI state is estimated from sentence-level counts in the training split
+    only.  At inference, the model returns a score for a candidate pair and
+    leaves thresholding and tie-breaking to the linker.
+    """
 
     def __init__(self, *, threshold: float = 0.0) -> None:
         self.threshold = threshold
@@ -52,6 +69,15 @@ class PMIModel:
         *,
         threshold: float = 0.0,
     ) -> Self:
+        """Create a fitted PMI model from saved pair scores.
+
+        Args:
+            scores: Mapping from ``(aspect, opinion)`` keys to PMI values.
+            threshold: Minimum score accepted by the PMI linker.
+
+        Returns:
+            A fitted model suitable for :meth:`score`.
+        """
         model = cls(threshold=threshold)
         model.scores = {
             (_normalise(aspect), _normalise(opinion)): float(score)
@@ -61,6 +87,19 @@ class PMIModel:
         return model
 
     def fit(self, corpus: Corpus, lexicon: OpinionLexicon) -> Self:
+        """Estimate sentence-level PMI scores from a training corpus.
+
+        Gold aspect text supplies the aspect side of each training pair, while
+        the already-fitted opinion lexicon supplies candidate opinion lemmas.
+        This keeps the statistical state inside the training boundary.
+
+        Args:
+            corpus: Training reviews and their gold aspect annotations.
+            lexicon: Fitted opinion lexicon used to obtain opinion candidates.
+
+        Returns:
+            The fitted PMI model.
+        """
         opinions = _group_opinions(lexicon.transform(corpus))
         aspect_counts: Counter[str] = Counter()
         opinion_counts: Counter[str] = Counter()
@@ -103,6 +142,19 @@ class PMIModel:
         return self
 
     def score(self, aspect_text: str, opinion_lemma: str) -> float | None:
+        """Return the learned PMI value for one candidate pair.
+
+        Args:
+            aspect_text: Surface form of the predicted aspect.
+            opinion_lemma: Normalised opinion lemma.
+
+        Returns:
+            The learned score, or ``None`` when the pair was not observed in
+            training data.
+
+        Raises:
+            RuntimeError: If the model has not been fitted.
+        """
         if not self._is_fitted:
             raise RuntimeError("PMIModel must be fitted before scoring")
         return self.scores.get((_aspect_key(aspect_text), _normalise(opinion_lemma)))
@@ -132,6 +184,7 @@ def _group_opinions(
 
 
 def _dependency_distance(left: Token, right: Token) -> int | None:
+    """Return the shortest dependency-path length between two tokens."""
     def chain(token: Token) -> dict[int, int]:
         distances: dict[int, int] = {token.i: 0}
         current = token
@@ -163,6 +216,7 @@ def _pmi_choice(
     opinions: tuple[Opinion, ...],
     pmi: PMIModel,
 ) -> Opinion | None:
+    """Choose the highest-scoring opinion above the PMI threshold."""
     scored = []
     for opinion in opinions:
         score = pmi.score(aspect.text, opinion.lemma)
@@ -177,6 +231,7 @@ def _dependency_choice(
     opinions: tuple[Opinion, ...],
     max_distance: int,
 ) -> Opinion | None:
+    """Choose the nearest dependency-connected opinion candidate."""
     head = _aspect_head(aspect)
     candidates = []
     for opinion in opinions:
@@ -194,7 +249,26 @@ def link_aspects(
     method: LinkMethod,
     max_dep_distance: int = 4,
 ) -> tuple[AspectOpinionLink, ...]:
-    """Link supplied predictions without access to annotations or corpus state."""
+    """Link predicted aspects to opinion candidates at inference time.
+
+    The function deliberately accepts predictions rather than annotations, so
+    it can be used unchanged for deployment and product summaries.  Gold
+    aspects are used only by the explicitly labelled component diagnostic.
+
+    Args:
+        aspects: Predicted aspect spans, typically decoded from the CRF.
+        opinions: Opinion candidates produced by the fitted lexicon.
+        pmi: Training-fitted PMI model used by statistical strategies.
+        method: ``dep``, ``pmi``, ``dep->pmi``, or ``pmi->dep``.
+        max_dep_distance: Maximum dependency-path length for dependency links.
+
+    Returns:
+        Deterministically sorted deployable links.  Neutral opinion records do
+        not produce links.
+
+    Raises:
+        ValueError: If the method or dependency distance is invalid.
+    """
 
     if method not in _METHODS:
         raise ValueError(f"Unsupported linking method: {method}")
@@ -204,6 +278,8 @@ def link_aspects(
     links: list[AspectOpinionLink] = []
 
     for aspect in aspects:
+        # Neutral candidates are retained for diagnostics but cannot support
+        # a deployable sentiment link.
         sentence_opinions = grouped_opinions.get(
             (aspect.review_uid, aspect.sentence_index), ()
         )

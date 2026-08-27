@@ -20,7 +20,18 @@ _NEGATORS = frozenset(
 
 @dataclass(frozen=True)
 class Opinion:
-    """One opinion-bearing token with its context-adjusted polarity."""
+    """Represent one opinion-bearing token and its inferred polarity.
+
+    Attributes:
+        review_uid: Stable identifier of the source review.
+        product_name: Product associated with the review.
+        sentence_index: Zero-based sentence index containing the token.
+        text: Surface form of the opinion candidate.
+        lemma: Normalised form used by the fitted lexicon.
+        token_index: Absolute spaCy token index in the review document.
+        polarity: Context-adjusted sign in ``{-1, 0, 1}``.
+        token: Underlying spaCy token for dependency-based linking.
+    """
 
     review_uid: str
     product_name: str
@@ -33,7 +44,13 @@ class Opinion:
 
 
 class OpinionLexicon:
-    """Weakly supervised polarity lexicon fitted from training annotations."""
+    """Infer domain-specific opinion polarity from labelled training aspects.
+
+    Adjective and verb lemmas observed near positive and negative gold aspects
+    receive a smoothed log-odds sign.  At inference time, a small left-context
+    negation rule can flip that sign.  The model is fitted once and then used
+    unchanged on development and test reviews.
+    """
 
     def __init__(
         self,
@@ -64,6 +81,20 @@ class OpinionLexicon:
         *,
         negation_window: int = 3,
     ) -> Self:
+        """Create a fitted lexicon from precomputed lemma polarities.
+
+        This constructor is used by the negation ablation so both conditions
+        share exactly the same learned vocabulary and polarity signs.
+
+        Args:
+            polarities: Mapping from normalised lemma to ``-1``, ``0``, or
+                ``+1``.
+            negation_window: Number of tokens to inspect to the left at
+                inference time.
+
+        Returns:
+            A fitted :class:`OpinionLexicon` with no corpus refit required.
+        """
         model = cls(min_count=1, negation_window=negation_window)
         model.polarities = {
             lemma.lower(): int(polarity) for lemma, polarity in polarities.items()
@@ -73,6 +104,15 @@ class OpinionLexicon:
         return model
 
     def fit(self, corpus: Corpus) -> Self:
+        """Fit polarity signs from nearby aligned training aspects.
+
+        Args:
+            corpus: Training reviews only.  Unaligned and neutral annotations
+                do not contribute supervision.
+
+        Returns:
+            The fitted lexicon.
+        """
         positive: Counter[str] = Counter()
         negative: Counter[str] = Counter()
         for review in corpus:
@@ -109,6 +149,7 @@ class OpinionLexicon:
             if positive[lemma] + negative[lemma] >= self.min_count
         }
         self.polarities = {}
+        # Fit lexical evidence once; negation is an inference-time ablation.
         for lemma, (positive_count, negative_count) in self.counts.items():
             score = math.log(
                 (positive_count + self.alpha) / (negative_count + self.alpha)
@@ -118,6 +159,20 @@ class OpinionLexicon:
         return self
 
     def transform(self, corpus: Corpus) -> tuple[Opinion, ...]:
+        """Extract lexicon-backed adjective and verb opinion candidates.
+
+        Args:
+            corpus: Reviews to transform with the frozen lexicon.
+
+        Returns:
+            Deterministically sorted opinion records.  Candidates with an
+            unknown lemma are omitted; a known polarity of zero is retained
+            for diagnostics but is not deployable by the linker.
+
+        Raises:
+            RuntimeError: If called before :meth:`fit` or
+                :meth:`from_polarities`.
+        """
         if not self._is_fitted:
             raise RuntimeError("OpinionLexicon must be fitted before transformation")
         opinions: list[Opinion] = []

@@ -10,6 +10,7 @@ import pandas as pd
 
 
 def _axes(ax: Axes | None, *, figsize: tuple[float, float]) -> tuple[Figure, Axes]:
+    """Reuse a caller's axes or create a figure with the requested size."""
     if ax is not None:
         return ax.figure, ax
     return plt.subplots(figsize=figsize)
@@ -20,7 +21,16 @@ def plot_ate_comparison(
     *,
     ax: Axes | None = None,
 ) -> tuple[Figure, Axes]:
-    """Plot grouped aspect-extraction precision, recall and F1 bars."""
+    """Plot precision, recall, and F1 for each aspect extractor.
+
+    Args:
+        frame: DataFrame containing ``pipeline``, ``precision``, ``recall``,
+            and ``f1`` columns.
+        ax: Optional axes to draw on; a new figure is created when omitted.
+
+    Returns:
+        The figure and axes containing the grouped bar chart.
+    """
 
     figure, axes = _axes(ax, figsize=(9, 5))
     positions = np.arange(len(frame))
@@ -42,7 +52,15 @@ def plot_linking_tradeoff(
     *,
     ax: Axes | None = None,
 ) -> tuple[Figure, Axes]:
-    """Plot the accuracy--coverage trade-off for linker strategies."""
+    """Plot linker accuracy against gold-aspect coverage.
+
+    Args:
+        frame: DataFrame containing ``method``, ``coverage``, and ``accuracy``.
+        ax: Optional axes to draw on; a new figure is created when omitted.
+
+    Returns:
+        The figure and axes containing the labelled trade-off scatter plot.
+    """
 
     figure, axes = _axes(ax, figsize=(7, 5))
     axes.scatter(frame["coverage"], frame["accuracy"], s=65)
@@ -62,7 +80,16 @@ def plot_product_summary(
     *,
     ax: Axes | None = None,
 ) -> tuple[Figure, Axes]:
-    """Plot positive and negative evidence for product aspects."""
+    """Plot positive and negative link counts for product/aspect rows.
+
+    Args:
+        frame: DataFrame containing ``product``, ``aspect``, ``positive``, and
+            ``negative`` columns.
+        ax: Optional axes to draw on; a new figure is created when omitted.
+
+    Returns:
+        The figure and axes containing the horizontal sentiment bars.
+    """
 
     height = max(4.0, 0.38 * max(len(frame), 1) + 1.5)
     figure, axes = _axes(ax, figsize=(9, height))

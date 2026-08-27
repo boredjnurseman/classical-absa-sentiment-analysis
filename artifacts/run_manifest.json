@@ -11,7 +11,7 @@
     "negation_ablation.csv": "73d7770de66678c8a083932ae3e8f0700ce57c4416576a366458f9ae6b2521c0",
     "product_summaries.csv": "d07226b6c1febe258346248f480bd82e3ebe90a09b0ba349ff099fff3c1088dd"
   },
-  "created_utc": "2026-08-27T19:13:10.279822+00:00",
+  "created_utc": "2026-08-27T21:41:34.543349+00:00",
   "data_sha256": {
     "CustomerReviews-3_domains/Computer.txt": "b887a5ccdaa2f877d40643be42049b93c682bb7d89d20f0f1cbb5dcc85a9c6b2",
     "CustomerReviews-3_domains/Readme.txt": "b2151358dc171708b11f71d098b9fcf1469aea8c6474fb45001e0d0b59f85d72",
@@ -33,7 +33,7 @@
     "Reviews-9-products/ipod.txt": "d937f603c6d1bd498ec691b0d1e161d40f2dac632aabb722cb5312a2759fe7bc",
     "Reviews-9-products/norton.txt": "c445fa30eae4a39f7c2201c9f02bc3f5eb2a60d20189d557e2ba593659a0c97b"
   },
-  "elapsed_seconds": 69.109,
+  "elapsed_seconds": 50.273,
   "learned_state": {
     "opinion_lexicon_size": 193,
     "pmi_pair_count": 6187

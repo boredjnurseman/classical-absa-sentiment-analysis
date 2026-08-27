@@ -23,7 +23,25 @@ def make_product_summary(
     count_mode: CountMode = "unique_reviews",
     top_k: int | None = None,
 ) -> pd.DataFrame:
-    """Count predicted positive and negative evidence by product and aspect."""
+    """Aggregate deployable links into product-level sentiment evidence.
+
+    Only links produced from predicted aspects should be passed here.  The
+    summary reports positive, negative, and total link counts for each
+    product/aspect pair; it never uses gold aspects to create deployable rows.
+
+    Args:
+        links: Predicted aspect--opinion links to aggregate.
+        count_mode: ``unique_reviews`` counts each product/aspect once per
+            review, while ``occurrences`` counts every link.
+        top_k: Optional number of rows to retain per product after sorting.
+
+    Returns:
+        A deterministic DataFrame with product, aspect, polarity counts, total,
+        and count-mode columns.
+
+    Raises:
+        ValueError: If ``count_mode`` is unsupported or ``top_k`` is invalid.
+    """
 
     if count_mode not in {"unique_reviews", "occurrences"}:
         raise ValueError("count_mode must be 'unique_reviews' or 'occurrences'")

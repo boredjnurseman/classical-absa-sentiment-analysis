@@ -17,7 +17,18 @@ from .schema import Corpus, GoldAspect, SentenceKey
 
 @dataclass(frozen=True)
 class Aspect:
-    """One predicted aspect span."""
+    """Represent one predicted or gold-aligned aspect span.
+
+    Attributes:
+        review_uid: Stable identifier of the source review.
+        product_name: Product associated with the review.
+        sentence_index: Zero-based sentence index within the review.
+        text: Normalised surface form of the aspect.
+        start_token: Inclusive spaCy token index.
+        end_token: Exclusive spaCy token index.
+        tokens: The spaCy tokens making up the span.  Tokens are excluded from
+            dataclass equality because they carry a reference to the document.
+    """
 
     review_uid: str
     product_name: str
@@ -30,7 +41,15 @@ class Aspect:
 
 @dataclass(frozen=True)
 class SequenceDataset:
-    """Sentence-level CRF inputs with the context needed to decode spans."""
+    """Hold sentence-level CRF features, labels, and decoding context.
+
+    Attributes:
+        features: Feature dictionaries for each token in each sentence.
+        labels: BIO labels, or all-``O`` placeholders for prediction inputs.
+        keys: Review UID and sentence index for each sequence.
+        product_names: Product aligned with each sequence.
+        tokens: Original spaCy tokens used to reconstruct predicted spans.
+    """
 
     features: tuple[tuple[dict[str, object], ...], ...]
     labels: tuple[tuple[str, ...], ...]
@@ -41,7 +60,12 @@ class SequenceDataset:
 
 @dataclass(frozen=True)
 class AlignmentError:
-    """Internal, location-aware explanation for one alignment failure."""
+    """Describe one internal aspect/polarity alignment error.
+
+    These records retain location and polarity detail for debugging, but are
+    intentionally kept out of public artifacts.  Public reports expose only
+    aggregate counts by ``reason``.
+    """
 
     reason: str
     review_uid: str
@@ -53,7 +77,14 @@ class AlignmentError:
 
 @dataclass(frozen=True)
 class AlignmentReport:
-    """Coverage of sentence annotations by exact contiguous token spans."""
+    """Summarise how many annotations can supervise contiguous BIO spans.
+
+    Attributes:
+        total_gold_aspects: Number of non-empty annotation records inspected.
+        aligned_aspects: Records matched to a non-overlapping token span.
+        errors: Internal location-aware records for unmatched or downstream
+            alignment failures.
+    """
 
     total_gold_aspects: int
     aligned_aspects: int
@@ -61,11 +92,13 @@ class AlignmentReport:
 
     @property
     def reason_counts(self) -> dict[str, int]:
+        """Return deterministic aggregate counts of internal error reasons."""
         counts: Counter[str] = Counter(error.reason for error in self.errors)
         return dict(sorted(counts.items()))
 
     @property
     def match_rate(self) -> float:
+        """Return the fraction of gold aspects aligned to token spans."""
         return (
             self.aligned_aspects / self.total_gold_aspects
             if self.total_gold_aspects
@@ -95,7 +128,19 @@ def _sort(aspects: Iterable[Aspect]) -> tuple[Aspect, ...]:
 
 
 def extract_aspect_candidates(corpus: Corpus) -> tuple[Aspect, ...]:
-    """Extract noun chunks and uncovered standalone nouns."""
+    """Generate interpretable noun-phrase and standalone-noun candidates.
+
+    Noun chunks provide multi-token candidates; standalone ``NOUN`` and
+    ``PROPN`` tokens fill gaps not covered by a chunk.  This deliberately
+    high-recall output is the input to the linguistic and statistical
+    baselines, not the deployable CRF model.
+
+    Args:
+        corpus: Parsed corpus whose spaCy sentences supply candidates.
+
+    Returns:
+        Deterministically sorted aspect candidates with token spans.
+    """
 
     candidates: list[Aspect] = []
     for review in corpus:
@@ -137,7 +182,18 @@ def extract_aspect_candidates(corpus: Corpus) -> tuple[Aspect, ...]:
 
 
 def linguistic_filter(aspects: Iterable[Aspect]) -> tuple[Aspect, ...]:
-    """Keep noun phrases with at least one non-stop lexical token."""
+    """Remove syntactically weak noun candidates from an iterable.
+
+    Stopword-only phrases and phrases ending in function-word POS tags are
+    discarded.  The filter is intentionally transparent so its precision and
+    recall trade-off can be compared with the raw candidate baseline.
+
+    Args:
+        aspects: Candidate aspect spans to filter.
+
+    Returns:
+        Deterministically sorted candidates containing lexical content.
+    """
 
     kept = []
     for aspect in aspects:
@@ -188,13 +244,31 @@ def _filter_vocabulary(
 
 @dataclass(frozen=True)
 class ATEBaselineSuite:
-    """Five candidate baselines with statistical state fitted on training data."""
+    """Fit the five interpretable ATE variants without test-set vocabulary.
+
+    The raw and linguistic vocabularies are learned per product from training
+    candidates.  Applying them later yields the statistical, linguistic-then-
+    statistical, and statistical-then-linguistic variants alongside the two
+    unfitted baselines.
+    """
 
     raw_vocabulary: dict[str, frozenset[str]]
     linguistic_vocabulary: dict[str, frozenset[str]]
 
     @classmethod
     def fit(cls, corpus: Corpus, *, top_k: int = 200) -> Self:
+        """Fit product vocabularies from training candidates.
+
+        Args:
+            corpus: Training corpus only; no development or test text is used.
+            top_k: Maximum number of terms retained per product vocabulary.
+
+        Returns:
+            A fitted baseline suite ready for :meth:`transform`.
+
+        Raises:
+            ValueError: If ``top_k`` is less than one.
+        """
         if top_k < 1:
             raise ValueError("top_k must be at least 1")
         raw = extract_aspect_candidates(corpus)
@@ -205,6 +279,14 @@ class ATEBaselineSuite:
         )
 
     def transform(self, corpus: Corpus) -> dict[str, tuple[Aspect, ...]]:
+        """Apply every baseline variant to a corpus.
+
+        Args:
+            corpus: Reviews to score using the already-fitted vocabularies.
+
+        Returns:
+            A mapping from pipeline name to its sorted predicted aspect spans.
+        """
         raw = extract_aspect_candidates(corpus)
         linguistic = linguistic_filter(raw)
         statistical = _filter_vocabulary(raw, self.raw_vocabulary)
@@ -225,7 +307,14 @@ class ATEBaselineSuite:
 def aspects_by_sentence(
     aspects: Iterable[Aspect],
 ) -> dict[SentenceKey, tuple[str, ...]]:
-    """Group predicted aspect text by review and sentence."""
+    """Group predicted surface forms by review and sentence key.
+
+    Args:
+        aspects: Predicted aspect spans from a baseline or CRF.
+
+    Returns:
+        A mapping suitable for sentence-level span evaluation.
+    """
 
     grouped: defaultdict[SentenceKey, list[str]] = defaultdict(list)
     for aspect in aspects:
@@ -241,7 +330,12 @@ def _gold_token_spans(
     sentence: Span,
     aspect_texts: Sequence[str],
 ) -> tuple[tuple[int, int], ...]:
-    """Align gold phrases to non-overlapping sentence token spans."""
+    """Align text-only gold phrases to non-overlapping token spans.
+
+    This adapter is used by component code that has aspect text but not its
+    original polarity.  Longer phrases are matched first so a multi-word
+    annotation claims its tokens before a nested short phrase can do so.
+    """
 
     annotations = tuple(GoldAspect(text, 0) for text in aspect_texts)
     return tuple(
@@ -257,7 +351,13 @@ def _aligned_gold_annotations(
     sentence: Span,
     annotations: Sequence[GoldAspect],
 ) -> tuple[tuple[GoldAspect, tuple[int, int] | None], ...]:
-    """Return each annotation paired with its unambiguous token span."""
+    """Pair each annotation with its first available contiguous token span.
+
+    Matching is case-insensitive and token-based rather than character-based,
+    which tolerates whitespace normalisation while preserving model token
+    coordinates.  Annotations are considered in descending phrase length and
+    never overlap previously assigned tokens.
+    """
 
     sentence_words = tuple(token.text.lower() for token in sentence)
     occupied: set[int] = set()
@@ -289,6 +389,13 @@ def _aligned_gold_annotations(
 
 
 def _token_features(sentence: Span, relative_index: int) -> dict[str, object]:
+    """Build lexical, syntactic, shape, and local-context CRF features.
+
+    The feature set keeps the classical model inspectable: token identity and
+    lemma are combined with POS, dependency, orthographic shape, affixes, and
+    one-token context.  Boundary flags let the CRF learn sentence-edge
+    regularities without any access to gold labels at prediction time.
+    """
     token = sentence[relative_index]
 
     def lexical(prefix: str, value: Token) -> dict[str, object]:
@@ -325,7 +432,18 @@ def build_bio_sequences(
     *,
     include_labels: bool = True,
 ) -> SequenceDataset:
-    """Convert reviews to sentence-level features and BIO labels."""
+    """Convert parsed reviews into feature and BIO sequence inputs.
+
+    Args:
+        corpus: Reviews whose clean spaCy documents provide token sequences.
+        include_labels: Whether to project aligned gold annotations into BIO
+            labels.  Set false for inference so the model receives features
+            only.
+
+    Returns:
+        A :class:`SequenceDataset` retaining enough context to decode token
+        predictions back into :class:`Aspect` objects.
+    """
 
     feature_sequences: list[tuple[dict[str, object], ...]] = []
     label_sequences: list[tuple[str, ...]] = []
@@ -338,6 +456,8 @@ def build_bio_sequences(
             labels = ["O"] * len(sentence)
             if include_labels:
                 gold = review.annotations.get(sentence_index, ())
+                # Only contiguous source-supported matches become supervision;
+                # unmatched annotations stay visible in the alignment report.
                 spans = _gold_token_spans(sentence, [item.text for item in gold])
                 for start, end in spans:
                     labels[start - sentence.start] = "B"
@@ -361,7 +481,16 @@ def build_bio_sequences(
 
 
 def bio_alignment_diagnostic(corpus: Corpus) -> AlignmentReport:
-    """Report how many gold phrases can supply unambiguous BIO supervision."""
+    """Measure how much gold annotation can become reliable BIO supervision.
+
+    Args:
+        corpus: Usually the training split whose annotations will supervise the
+            CRF.
+
+    Returns:
+        Aggregate alignment coverage plus internal records describing every
+        unmatchable annotation.
+    """
 
     total = 0
     aligned = 0
@@ -395,7 +524,16 @@ def decode_bio_predictions(
     dataset: SequenceDataset,
     predictions: Sequence[Sequence[str]],
 ) -> tuple[Aspect, ...]:
-    """Decode BIO label sequences into aspect spans."""
+    """Decode token-level BIO predictions into sorted aspect spans.
+
+    Args:
+        dataset: Feature dataset carrying tokens, keys, and product names.
+        predictions: One BIO label sequence for each dataset sequence.
+
+    Returns:
+        Predicted :class:`Aspect` objects with inclusive/exclusive token
+        coordinates.
+    """
 
     aspects: list[Aspect] = []
     for key, product, tokens, labels in zip(
@@ -439,7 +577,12 @@ def _decoded_aspect(
 
 
 class CRFAspectExtractor:
-    """Linear-chain CRF trained to identify aspect spans with BIO labels."""
+    """Train a linear-chain CRF to identify aspect spans with BIO labels.
+
+    The estimator is intentionally small and classical.  It learns transition
+    and observation weights over the transparent feature dictionaries produced
+    by :func:`build_bio_sequences`, then decodes globally coherent tag paths.
+    """
 
     def __init__(
         self,
@@ -458,12 +601,31 @@ class CRFAspectExtractor:
         self._is_fitted = False
 
     def fit(self, corpus: Corpus) -> Self:
+        """Fit the CRF on a training corpus.
+
+        Args:
+            corpus: Training reviews with aligned gold annotations.
+
+        Returns:
+            The fitted extractor, enabling fluent pipeline construction.
+        """
         dataset = build_bio_sequences(corpus)
         self.model.fit(dataset.features, dataset.labels)
         self._is_fitted = True
         return self
 
     def predict(self, corpus: Corpus) -> tuple[Aspect, ...]:
+        """Predict aspect spans for clean reviews.
+
+        Args:
+            corpus: Reviews to transform; gold labels are not required.
+
+        Returns:
+            Deterministically sorted predicted aspect spans.
+
+        Raises:
+            RuntimeError: If called before :meth:`fit`.
+        """
         if not self._is_fitted:
             raise RuntimeError("CRFAspectExtractor must be fitted before prediction")
         dataset = build_bio_sequences(corpus, include_labels=False)
